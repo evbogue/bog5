@@ -54,7 +54,7 @@ bogbot.publish = async (data) => {
   const dataHash = await sha256(data)
   await cachekv.put(dataHash, data)
 
-  const content = nameHash + imageHash + dataHash + previous || dataHash
+  const content = nameHash + imageHash + dataHash + previous
   const contentHash = await sha256(content)
   await cachekv.put(contentHash, content)
 
@@ -79,16 +79,16 @@ bogbot.open = async (protocol) => {
 
   const opened = encode(nacl.sign.open(decode(signed), decode(pubkey)))
   const obj = {pubkey, msgHash: opened}
-  obj.msg = await bogbot.find(obj.msgHash)
+  const msg = await bogbot.find(obj.msgHash)
 
-  obj.timestamp = parseInt(obj.msg.substring(0, 13))
-  obj.contentHash = obj.msg.substring(13)
+  obj.timestamp = parseInt(msg.substring(0, 13))
+  const contentHash = msg.substring(13)
 
-  obj.content = await bogbot.find(obj.contentHash)
-  obj.nameHash = obj.content.substring(0, 44)
-  obj.ImageHash = obj.content.substring(44, 88)
-  obj.dataHash = obj.content.substring(88, 132)
-  obj.prevHash = obj.content.substring(176)
+  const content = await bogbot.find(contentHash)
+  obj.nameHash = content.substring(0, 44)
+  obj.imageHash = content.substring(44, 88)
+  obj.dataHash = content.substring(88, 132)
+  obj.prevHash = content.substring(132)
 
   return obj
 }
@@ -98,4 +98,10 @@ const log = await cachekv.get('log') || []
 bogbot.find = async (hash) => {
   const found = await cachekv.get(hash)
   return found
+}
+
+bogbot.make = async (data) => {
+  const hash = await sha256(data)
+  await cachekv.put(hash, data)
+  return hash
 }

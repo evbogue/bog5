@@ -1,13 +1,25 @@
 import { bogbot } from './bogbot.js'
+import { serveDir } from 'https://deno.land/std/http/file_server.ts'
 
 const pubkey = await bogbot.pubkey()
 
-const content = 'Hello World'
+console.log(pubkey)
 
-const msg = await bogbot.publish(content)
+const sockets = new Set()
 
-const opened = await bogbot.open(msg)
-console.log(opened)
+const process = async (msg) => {
+  console.log(msg)
+}
 
-const found = await bogbot.find(opened.msgHash)
-console.log(found)
+Deno.serve((r) => {
+  try {
+    const { socket, response } = Deno.upgradeWebSocket(r)
+    sockets.add(socket)
+    socket.onmessage = process
+    socket.onclose = _ => sockets.delete(socket)
+    return response
+  } catch {
+    return serveDir(r, {quiet: 'True'})
+  }
+})
+
