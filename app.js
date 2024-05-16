@@ -1,54 +1,38 @@
 import { bogbot } from './bogbot.js'
 import { h } from './lib/h.js'
 import { cachekv } from './lib/cachekv.js'
+import { composer } from './composer.js'
 import { render } from './render.js'
+import { profile } from './profile.js'
 
-const screen = h('div', {id: 'screen'})
+if (window.location.hash === '') {window.location.hash = '#'}
 
-const scroller = h('div', {id: 'scroller'})
+const route = async (src) => {
+  const screen = h('div', {id: 'screen'})
+  const scroller = h('div', {id: 'scroller'})
+  const controls = h('div', {id: 'controls'})
+  
+  document.body.appendChild(screen)
+  screen.appendChild(scroller)
+  scroller.appendChild(controls)
 
-const controls = h('div', {id: 'controls'})
+  if (src === '' || src === await bogbot.pubkey()) {
+    controls.appendChild(await profile())
+    controls.appendChild(await composer())
+  }  
 
-document.body.appendChild(screen)
-screen.appendChild(scroller)
-scroller.appendChild(controls)
+  for (const opened of await bogbot.query(src)) {
+    const rendered = await render(opened)
+    controls.after(rendered)
+  }
+}
 
-controls.appendChild(h('div', [await bogbot.pubkey()]))
+window.onhashchange = async () => {
+  const screen = document.getElementById('screen')
+  screen.parentNode.removeChild(screen)  
+  const src = window.location.hash.substring(1)
+  route(src)
+}
 
-const nameHash = await cachekv.get('name')
-const nameBlob = await bogbot.find(nameHash)
+route(window.location.hash.substring(1))
 
-const namer = h('input', {
-  placeholder: nameBlob ||'Name yourself' 
-})
-
-const namerDiv = h('div', [
-  namer,
-  h('button', {onclick: async () => {
-    if (namer.value) {
-      namer.placeholder = namer.value
-      const nameBlob = await bogbot.make(namer.value)
-      await cachekv.put('name', nameBlob)
-      namer.value = ''
-    }
-  }}, ['Save'])
-])
-
-controls.appendChild(namerDiv)
-
-const composer = h('textarea', {placeholder: 'Write something ...'})
-
-const composeDiv = h('div', [
-  composer,
-  h('button', {onclick: async () => {
-    if (composer.value) {
-      const published = await bogbot.publish(composer.value)
-      composer.value = ''
-      const opened = await bogbot.open(published)
-      const rendered = await render(opened)
-      scroller.firstChild.after(rendered)      
-    } 
-  }}, ['Send'])
-])
-
-controls.appendChild(composeDiv)

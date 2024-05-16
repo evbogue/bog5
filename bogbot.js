@@ -33,7 +33,7 @@ bogbot.deletekey = async () => {
 }
 
 const sha256 = async (data) => {
-  const hash = encode(
+  const hash = await encode(
     Array.from(
       new Uint8Array(
         await crypto.subtle.digest("SHA-256", new TextEncoder().encode(data))
@@ -51,36 +51,37 @@ bogbot.publish = async (data) => {
   const imageHash = await cachekv.get('image') || pubkey 
   const previous = await cachekv.get('previous') || pubkey
 
-  const dataHash = await sha256(data)
-  await cachekv.put(dataHash, data)
+  const dataHash = await bogbot.make(data)
 
   const content = nameHash + imageHash + dataHash + previous
-  const contentHash = await sha256(content)
-  await cachekv.put(contentHash, content)
-
+  const contentHash = await bogbot.make(content)
   const msg = Date.now() + contentHash
 
-  const msgHash = await sha256(msg)
-  await cachekv.put(msgHash, msg)
+  const msgHash = await bogbot.make(msg)
 
   const signed = encode(
     nacl.sign(decode(msgHash), 
     decode(privkey))
   )
-
+  
   const protocol = pubkey + signed
 
-  return protocol
+  const protocolHash = await bogbot.make(protocol)
+  await cachekv.put('previous', protocolHash)
+  await bogbot.add(protocolHash)
+  return protocolHash
 }
 
-bogbot.open = async (protocol) => {
+bogbot.open = async (protocolHash) => {
+  const protocol = await bogbot.find(protocolHash)
+
   const pubkey = protocol.substring(0, 44)
   const signed = protocol.substring(44)
 
   const opened = encode(nacl.sign.open(decode(signed), decode(pubkey)))
   const obj = {pubkey, msgHash: opened}
   const msg = await bogbot.find(obj.msgHash)
-
+  obj.protocolHash = protocolHash
   obj.timestamp = parseInt(msg.substring(0, 13))
   const contentHash = msg.substring(13)
 
@@ -93,8 +94,6 @@ bogbot.open = async (protocol) => {
   return obj
 }
 
-const log = await cachekv.get('log') || []
-
 bogbot.find = async (hash) => {
   const found = await cachekv.get(hash)
   return found
@@ -104,4 +103,44 @@ bogbot.make = async (data) => {
   const hash = await sha256(data)
   await cachekv.put(hash, data)
   return hash
+}
+
+let log = []
+
+let openedLog = []
+
+try {
+  log = JSON.parse(await cachekv.get('log')) || []
+} catch {}
+
+console.log(log)
+
+if (log.length) {
+  for (const protocolHash of log) {
+    const opened = await bogbot.open(protocolHash)
+    opened.data = await bogbot.find(opened.dataHash)
+    openedLog.push(opened)
+  }
+}
+
+console.log(openedLog)
+
+bogbot.query = async (query) => {
+  if (!query) {
+    return openedLog
+  } else {
+    console.log(query)
+    const result = openedLog.filter(opened => 
+      opened.pubkey == query ||
+      opened.protocolHash == query ||
+      opened.msgHash == query
+    )
+    console.log(result)
+    return result
+  }
+}
+
+bogbot.add = async (m) => {
+  log.push(m)
+  cachekv.put('log', JSON.stringify(log))
 }
