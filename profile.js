@@ -9,6 +9,10 @@ export const profile = async () => {
 
   const avatarImg = vb(decode(await bogbot.pubkey()), 256)
 
+  const existingImage = await cachekv.get('image')
+  
+  if (existingImage) { avatarImg.src = await bogbot.find(existingImage)}
+
   avatarImg.style = 'height: 30px; width: 30px; float: left; margin-right: 5px;'
 
   avatarImg.onclick = () => {uploader.click()}
@@ -24,8 +28,8 @@ export const profile = async () => {
       const ctx = canvas.getContext("2d")
       const img = new Image()
 
-      img.onload = () => {
-        const size = 64
+      img.onload = async () => {
+        const size = 256
         if (img.width > size || img.height > size) {
           const width = img.width
           const height = img.height
@@ -45,8 +49,12 @@ export const profile = async () => {
           ctx.drawImage(img, 0, 0, width, height, 0, 0, cropWidth, cropHeight)
           const croppedImage = canvas.toDataURL()
           avatarImg.src = croppedImage
+          const imgBlob = await bogbot.make(croppedImage)
+          await cachekv.put('image', imgBlob)
         } else {
           avatarImg.src = img.src
+          const imgBlob = await bogbot.make(croppedImage)
+          await cachekv.put('image', imgBlob)
         }
       }
       img.src = e.target.result

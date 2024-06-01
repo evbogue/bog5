@@ -33,6 +33,12 @@ export const render = async (m) => {
 
   img.style = 'height: 30px; width: 30px; float: left; margin-right: 5px;'
 
+  if (m.imageHash != m.pubkey) {
+    const image = await bogbot.find(m.imageHash)
+    console.log(image)
+    if (image) { img.src = image} 
+  }
+
   if (m.nameHash != m.pubkey) {
     pubkey.id = m.nameHash
     const name = await bogbot.find(m.nameHash)

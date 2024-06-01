@@ -4,8 +4,11 @@ import { cachekv } from './lib/cachekv.js'
 import { composer } from './composer.js'
 import { render } from './render.js'
 import { profile } from './profile.js'
+import { connect } from './connect.js'
 
 if (window.location.hash === '') {window.location.hash = '#'}
+
+connect()
 
 const route = async (src) => {
   const screen = h('div', {id: 'screen'})
@@ -30,8 +33,7 @@ const route = async (src) => {
 window.onhashchange = async () => {
   const screen = document.getElementById('screen')
   screen.parentNode.removeChild(screen)  
-  const src = window.location.hash.substring(1)
-  route(src)
+  route(window.location.hash.substring(1))
 }
 
 route(window.location.hash.substring(1))
